@@ -1,38 +1,42 @@
-import { useEffect, useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
-import { Auth } from "./components/auth";
-import { db } from "./config/firebase";
-import { getDocs, collection, addDoc } from "firebase/firestore";
+
+import React, { useEffect, useState } from 'react';
+import './App.css';
+import { db, auth } from './config/firebase';
+import { getDocs, collection, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import AuthComponent from './components/AuthComponent';
+import QuoteForm from './components/QuoteForm';
+import QuoteList from './components/QuoteList';
+import useQuotesStore from "../store/quotesStore";
 
 function App() {
-  const [quotesList, setQuotesList] = useState([]);
+  const { quotes, setQuotes } = useQuotesStore();
 
-  //new quote state
-  const [newQuoteAuthor, setNewQuoteAuthor] = useState("");
-  const [newQuoteText, setNewQuoteText] = useState("");
-  const [newQuoteUrl, setNewQuoteUrl] = useState("");
-
+  const [updatedAuthor, setUpdatedAuthor] = useState("");
   const quotesCollectionRef = collection(db, "quotes");
-  //read the data
+
   const getQuotesList = async () => {
     try {
       const data = await getDocs(quotesCollectionRef);
-      //extrac data from data obj
       const quotes = data.docs.map((doc) => ({
         ...doc.data(),
         id: doc.id,
       }));
-      //set  the movie list = data
-      //lancia allo usetState
-      setQuotesList(quotes);
+       setQuotes(quotes);
     } catch (error) {
       console.error(error);
     }
   };
-  //read the db
   useEffect(() => {
+    const fetchQuotes = async () => {
+    const quotesCollectionRef = collection(db, "quotes");
+    const data = await getDocs(quotesCollectionRef);
+    const quotes = data.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
+    setQuotes(quotes);
+  };
+  //-----------------------------
     getQuotesList();
   }, []);
 
@@ -42,59 +46,46 @@ function App() {
         author: newQuoteAuthor,
         text: newQuoteText,
         url: newQuoteUrl,
+        userId: auth?.currentUser?.uid,
       });
-      //how to empty the values ? 
-      getQuotesList()
+      // Ricarica le citazioni dopo l'aggiunta per aggiornare l'interfaccia utente
+      const data = await getDocs(quotesCollectionRef);
+      const quotes = data.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id,
+      }));
+      setQuotes(quotes); // Aggiorna lo store Zustand con le nuove citazioni
     } catch (error) {
       console.error(error);
     }
   };
+
+  const deleteQuote = async (id) => {
+    const quoteDoc = doc(db, "quotes", id);
+    await deleteDoc(quoteDoc);
+    getQuotesList();
+  };
+
+  // const updateQuoteAuthor = async (id) => {
+  //   const quoteDoc = doc(db, "quotes", id);
+  //   await updateDoc(quoteDoc, { author: updatedAuthor });
+  //   getQuotesList();
+  //   setUpdatedAuthor("test")
+  // };
+  const updateQuoteAuthor = async (id, newAuthor) => {
+    const quoteDoc = doc(db, "quotes", id);
+    await updateDoc(quoteDoc, { author: newAuthor });
+    getQuotesList(); 
+  };
+
   return (
     <>
-      <Auth />
+      <AuthComponent />
       <h1>SparkQuotes</h1>
-
-      <h3>Add a Quote</h3>
-
-      <div className="py-3">
-        <input
-          type="text"
-          placeholder="quote author"
-          onChange={(e) => setNewQuoteAuthor(e.target.value)}
-        />
-        {/* meglio textarea in teoria */}
-        <input
-          type="text"
-          placeholder="quote text"
-          onChange={(e) => setNewQuoteText(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="quote url"
-          onChange={(e) => setNewQuoteUrl(e.target.value)}
-        />
-        <button onClick={onSubmitQuote} className="my-3">
-          Add Quote
-        </button>
-      </div>
-
-      <div className="card">
-        <h2 className="text-lg font-mono  py-2">quotes list :</h2>
-        {/* maps trought quotesList all'arrivo di use effect */}
-        {quotesList.map((quote, i) => (
-          <div key={i}>
-            <hr />
-            <div>id:{quote.id}</div>
-            <div>Author:{quote.author}</div>
-            <div>Text:{quote.text}</div>
-            <div>Url:{quote.url}</div>
-            <hr />
-          </div>
-        ))}
-        <p className=" text-red-500 text-lg font-bold py-3">
-          Works with Tailwind
-        </p>
-      </div>
+      <QuoteForm
+      />
+      <QuoteList
+      />
     </>
   );
 }
